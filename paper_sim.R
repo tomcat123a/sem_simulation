@@ -233,6 +233,33 @@ computebic<-function(fit,x,precision=5e-4,special=FALSE){
   #this applies to lbfgs,gradsamp,regsem
   x[pars_pen_mod][abs(x[pars_pen_mod])<precision]=0
   nvar=nx-sum( abs(x[pars_pen_mod])==0)
+  #npenvar=length(pars_pen_mod)-sum( abs(x[pars_pen_mod])==0  )
+  #return( 2*NDATA*fit+(log(NDATA))*nvar+2*log(choose(length(pars_pen_mod),npenvar))  )
+  if(special==FALSE){
+    return( 2*NDATA*fit+(log(NDATA))*nvar )
+  }else{
+    return(  NDATA*fit+(log(NDATA))*nvar )
+  }
+}
+
+computebiclsl<-function(fit,x,mod,penalized_index,precision=5e-4){
+  #this applies to lbfgs,gradsamp,regsem
+  if(mod==3){
+      x[penalized_index][abs(x[penalized_index])<precision]=0
+      nvar=nx-sum( abs(x[penalized_index])==0)
+      #npenvar=length(penalized_index)-sum( abs(x[penalized_index])==0  )
+      #return( 2*NDATA*fit+(log(NDATA))*nvar+2*log(choose(length(pars_pen_mod),npenvar))  )
+  
+    return( 2*NDATA*fit+(log(NDATA))*nvar )
+  
+  }
+}
+
+
+computebiclslx<-function(fit,x,precision=5e-4,mod){
+  #this applies to lbfgs,gradsamp,regsem
+  x[pars_pen_mod][abs(x[pars_pen_mod])<precision]=0
+  nvar=nx-sum( abs(x[pars_pen_mod])==0)
   npenvar=length(pars_pen_mod)-sum( abs(x[pars_pen_mod])==0  )
   #return( 2*NDATA*fit+(log(NDATA))*nvar+2*log(choose(length(pars_pen_mod),npenvar))  )
   if(special==FALSE){
@@ -241,6 +268,7 @@ computebic<-function(fit,x,precision=5e-4,special=FALSE){
     return(  NDATA*fit+(log(NDATA))*npenvar )
   }
 }
+
 
 ####################start mod script
 L1<-list()#true model
@@ -1106,6 +1134,11 @@ regsemt<-function(method){
 
 
 getbic<-function(method,lambda){
+  #likelihood for lavaan is NDATA/2*(LOGDET..)
+  #fit for regsem is 0.5*(log(det(sigma_inverse))....+lambda*|x|)
+  #fit for gscpp,lbfgs is 0.5*(log(det(sigma_inverse))....) + lambda*|x|
+  #fit for lsl is log(det(sigma_inverse))....
+  #fit for lslx is loss value which is log(det(sigma_inverse))...
   l<<-lambda
 
   if(method=="regsem1"){#proximal gradient, line search=FALSE
@@ -1317,7 +1350,15 @@ getbic<-function(method,lambda){
       #order_coef=c(1:48,c(67,70,73,78,80),c(68,71,74,76,81),c(69,72,75,77,79),49:66,c(82,85,87,88,89,90,83,84,86))
       coef=coef_r[ ,2]
       fit=0.5*lsl_r$`bic optimal`[4]
-      bic=NDATA*lsl_r$`bic optimal`[18]
+      #bic=NDATA*lsl_r$`bic optimal`[18]
+      penalty_index=c()
+      for(i in 1:length(coef)){
+        if(grepl("lambda" ,rownames(coef_r)[i])|grepl("beta", rownames(coef_r)[i])){
+          penalty_index=c(penalty_index,i)
+        }
+        
+      }
+      bic=computebiclsl(fit,coef,mod=3,penalized_index=penalty_index)
       status=0
     }
 
@@ -1347,91 +1388,7 @@ getbic<-function(method,lambda){
 
 
     }
-    if(mod_num==4){
-      lslxmod=paste0('fix(1) *x1 + free()*x2 + free()*x3 <=: f1
-      fix(1) *x4 + free()*x5 + free()*x6 <=: f2
-      fix(1) *x7 + free()*x8 + free()*x9 <=: f3
-       x4 + x5 + x6 + x7 + x8 + x9 <~: f1
-       x1 + x2 + x3 + x7 + x8 + x9 <~: f2
-       x4 + x5 + x6 + x7 + x8 + x9 <~: f3
-      fix(1) *x10 + free()*x11 + free()*x12 <=: f4
-      fix(1) *x13 + free()*x14 + free()*x15 <=: f5
-      fix(1) *x16 + free()*x17 + free()*x18 <=: f6
-       x13 + x14 + x15 + x16 + x17+ x18 <~: f4
-       x10 + x11 + x12 + x16 + x17 + x18 <~: f5
-       x10 + x11 + x12 + x13 + x14 + x15 <~: f6
-      f4<= f1 +   f2 +   f3 + free()*f5 +  f6
-      f5<= f1+free()*f2+ f3+ f4+ f6
-      f6<~ f1+ f2+ f3+ f4+ f5
-
-      ')
-    }
-      if(mod_num==8){
-        lslxmod=paste0('fix(1) *x1 + free()*x2 + free()*x3 <=: f1
-      fix(1) *x4 + free()*x5 + free()*x6 <=: f2
-       fix(1) *x7 + free()*x8 + free()*x9 <=: f3
-       x4 + x5 + x6 + x7 + x8 + x9 <~: f1
-       x1 + x2 + x3 + x7 + x8 + x9 <~: f2
-       x4 + x5 + x6 + x7 + x8 + x9 <~: f3
-       fix(1) *x10 + free()*x11 + free()*x12 <=: f4
-       fix(1) *x13 + free()*x14 + free()*x15 <=: f5
-       fix(1) *x16 + free()*x17 + free()*x18 <=: f6
-       x13 + x14 + x15 + x16 + x17+ x18 <~: f4
-       x10 + x11 + x12 + x16 + x17 + x18 <~: f5
-       x10 + x11 + x12 + x13 + x14 + x15 <~: f6
-       f4<= f1 +   f2 +   f3 + f5 +  f6
-       f5<= f1+free()*f2+ f3+ f4+ f6
-       f6<~ f1+ f2+ f3+ f4+ f5
-       ')
-      }
-
-    if(mod_num==9){
-      lslxmod=paste0('fix(1) *x1 + free(0)*x2 + free(0)*x3 <=: f1
-      fix(1) *x4 + free()*x5 + free()*x6 <=: f2
-      fix(1) *x7 + free()*x8 + free()*x9 <=: f3
-      x4 + x5 + x6 + x7 + x8 + x9 <~: f1
-      x1 + x2 + x3 + x7 + x8 + x9 <~: f2
-      x4 + x5 + x6 + x7 + x8 + x9 <~: f3
-      fix(1) *x10 + free()*x11 + free()*x12 <=: f4
-      fix(1) *x13 + free()*x14 + free()*x15 <=: f5
-      fix(1) *x16 + free()*x17 + free()*x18 <=: f6
-      x13 + x14 + x15 + x16 + x17+ x18 <~: f4
-      x10 + x11 + x12 + x16 + x17 + x18 <~: f5
-      x10 + x11 + x12 + x13 + x14 + x15 <~: f6
-      f4<= f1 +   f2 +   f3 + free()*f5 +  f6 + x19 + x20 + x21
-      f5<= f1+free()*f2+ f3+ f4+ f6 + x19 + x20 + x21
-      f6<~ f1+ f2+ f3+ f4+ f5 + x19 + x20 + x21
-      x19~~0*x20
-      x20~~0*x21
-      x19~~0*x21
-      x19+x20+x21~~0*f1+0*f2+0*f3
-      ')
-
-    }
-
-    if(mod_num==10){
-      lslxmod=paste0('fix(1) *x1  <=:f1
-      x2 + x3 + x4 + x5 + x6+ x7 + x8+ x9   <~: f1
-       fix(1) *x4 <=: f2
-       x5 + x6 + x1+ x2 + x3 + x7+ x8 + x9 <~: f2
-       fix(1) *x7 <=: f3
-       x8 + x9 + x1 + x2 + x3+ x4 + x5 + x6 <~: f3
-       fix(1) *x10  <=: f4
-       x11 + x12 + x13 + x14 + x15 + x16 + x17 + x18 <~: f4
-       fix(1) *x13  <=: f5
-       x14 + x15 + x10 + x11 + x12 + x16 + x17 + x18<~: f5
-       fix(1) *x16  <=: f6
-       x17 + x18 + x10 + x11 + x12 + x13 + x14 + x15<~: f6
-      f4<= f1 +   f2 +   f3 + free()*f5 +  f6 + x19 + x20 + x21
-      f5<= f1+free()*f2+ f3+ f4+ f6 + x19 + x20 + x21
-                     f6<~ f1+ f2+ f3+ f4+ f5 + x19 + x20 + x21
-                     x19~~0*x20
-                     x20~~0*x21
-                     x19~~0*x21
-                     x19+x20+x21~~0*f1+0*f2+0*f3
-                     ')
-
-    }
+     
     t0=proc.time()
     lslx_reg <- lslx$new(model = lslxmod,
                          data = dataorgS)
@@ -1442,7 +1399,7 @@ getbic<-function(method,lambda){
 
     r1=tryCatch(
       c(1,lslx_reg$fit(penalty_method = Typechar,
-                   lambda_grid = c(l),iter_out_max=maxit)),error=function(error){
+                   lambda_grid = c(l),delta_grid=c(3.7),iter_out_max=maxit)),error=function(error){
         print("lslx error l=")
         print(l)
         print(error)
@@ -1470,13 +1427,11 @@ getbic<-function(method,lambda){
 
       #lslx_reg$get_fitting()$fitted_result
       coef=lslx_reg$extract_coefficient(selector = "bic",include_faulty = TRUE)
-      fit=as.numeric(lslx_reg$get_fitting()$fitted_result$numerical_condition[[1]][7])
-      bic=computebic(fit,coef,TRUE)
-      if(Typechar=='lasso'){
-        status=-1+as.numeric(lslx_reg$get_fitting()$fitted_result$is_convergent)
-      }else{
-        status=-1+as.numeric(lslx_reg$get_fitting()$fitted_result$is_convergent[2])
-      }
+      fit=0.5*as.numeric(lslx_reg$get_fitting()$fitted_result$numerical_condition[[1]][7])
+      bic=computebiclslx(fit,coef,TRUE)
+      status=-1+as.numeric(lslx_reg$get_fitting()$fitted_result$is_convergent)
+      finite=-1+as.numeric(lslx_reg$get_fitting()$fitted_result$is_finite)
+      
     }
   }
   return(
@@ -1560,6 +1515,8 @@ bicseq<-function(lseq=SEQU){
 ###make model running
 
 updateall<-function(nd=NDATA){
+  #cov of R is divided by n-1,or cov=1/(ndata-1)X^T%*%X,X is centered so sample.cov.rescale
+#==TRUE
   lmod<<-sem(L3[[mod_num]],sample.nobs=nd,sample.cov=dataS,
              sample.cov.rescale=TRUE,int.ov.free=TRUE,
              int.lv.free=FALSE,fixed.x=FALSE,std.lv=FALSE,
@@ -1639,8 +1596,8 @@ if(mod_num<11){
     covS[[i]]=cov(dataorgS[c((nd*(i-1)/5+1):(nd*i/5)),])
   }
   l=NULL
-  #nx=max(max(A),max(S))
-  nx=fitmeasures(lmod,'df')
+  nx=max(max(A),max(S))
+  #nx=fitmeasures(lmod,'df')
   tmod=suppressWarnings(
     sem(L1[[mod_num]],sample.nobs=NDATA,sample.cov=dataS,sample.cov.rescale=TRUE,fixed.x=FALSE,
         do.fit=FALSE,control=list(iter.max=0),meanstructure=TRUE))
@@ -1691,7 +1648,8 @@ if(mod_num<11){
   
   NDATA=nrow(dat[[mod_num-10]])
   dataS=NDATA/(NDATA-1)*cov(dat[[mod_num-10]])
-  nx=fitmeasures(lmod,'df')
+  #nx=lmod@optim$npar
+  nx=max(max(A),max(S))
   covS=list()
   covrS=list()
   nd=NDATA
